@@ -1,2 +1,2 @@
 # overloaded
-Function overload
+Function overload. Supports type hinting
