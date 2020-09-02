@@ -1,5 +1,34 @@
 from functools import wraps
-    
+from typing import get_type_hints
+
+def strict_types(function):
+    def type_checker(*args, **kwargs):
+        hints = get_type_hints(function)
+
+        all_args = kwargs.copy()
+        all_args.update(dict(zip(function.__code__.co_varnames, args)))
+
+        for argument, argument_type in ((i, type(j)) for i, j in all_args.items()):
+            if argument in hints:
+                try:
+                    issub = issubclass(argument_type, hints[argument])
+                except TypeError as e:
+                    if str(e) == "Subscripted generics cannot be used with class and instance checks":
+                        pass
+                    else: raise e
+                else:
+                    if not issub:
+                        raise TypeError('Type of {} is {} and not {}'.format(argument, argument_type, hints[argument]))
+
+        result = function(*args, **kwargs)
+
+        if 'return' in hints and type(result) != hints['return']:
+            raise TypeError('Type of result is {} and not {}'.format(type(result), hints['return']))
+
+        return result
+
+    return type_checker
+
 class FIterator:
 
     def __init__(self):
@@ -19,7 +48,7 @@ class FIterator:
             except IndexError:
                 raise TypeError("Function(s) exist(s) but with a different signature.")
             except (TypeError, NameError) as e:                
-                if any(string in str(e) for string in ('missing', 'takes', 'not defined', 'unexpected', 'multiple')):
+                if any(string in str(e) for string in ('Type of', 'missing', 'takes', 'not defined', 'unexpected', 'multiple')):
                     continue
                 else:
                     raise e
@@ -42,7 +71,7 @@ class Overloader:
     store = defaultnamespace(FIterator)
     
     def __call__(self, f: callable):
-        getattr(self.store, f.__name__).append(f)
+        getattr(self.store, f.__name__).append(strict_types(f))
         return f
 
     def __getattribute__(self, name):
@@ -55,9 +84,14 @@ class Overloader:
 
 overloaded = Overloader()
 
+
 @overloaded
-def foo(a, b): 
+def foo(a: int, b: int): 
     print(a + b)
+
+@overloaded
+def foo(a: str, b: str): 
+    print('String' + a + b)
 
 @overloaded
 def foo(a, b, c): 
@@ -80,6 +114,8 @@ def bar(a, b, c):
     print(a * b * c, 'sup')
 
 
+
+overloaded.foo('sup', 'dude')
 overloaded.foo(100, 10)
 overloaded.foo(1, 2, 3)
 overloaded.foo(b=1, c=2, d=3)
