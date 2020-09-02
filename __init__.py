@@ -1,12 +1,13 @@
 from functools import wraps
 from typing import get_type_hints
+from operator import attrgetter
 
-def strict_types(function):
+def strict_types(f):
+    hints = get_type_hints(f)
     def type_checker(*args, **kwargs):
-        hints = get_type_hints(function)
 
         all_args = kwargs.copy()
-        all_args.update(dict(zip(function.__code__.co_varnames, args)))
+        all_args.update(dict(zip(f.__code__.co_varnames, args)))
 
         for argument, argument_type in ((i, type(j)) for i, j in all_args.items()):
             if argument in hints:
@@ -19,15 +20,17 @@ def strict_types(function):
                 else:
                     if not issub:
                         raise TypeError('Type of {} is {} and not {}'.format(argument, argument_type, hints[argument]))
-
-        result = function(*args, **kwargs)
+        
+        result = f(*args, **kwargs)
 
         if 'return' in hints and type(result) != hints['return']:
             raise TypeError('Type of result is {} and not {}'.format(type(result), hints['return']))
 
         return result
 
+    type_checker.hintcount = len(hints)
     return type_checker
+
 
 class FIterator:
 
@@ -39,16 +42,20 @@ class FIterator:
 
     def __call__(self, *args, **kwargs):
         idx = -1
+        self._store.sort(reverse=True, key=attrgetter('hintcount'))
         while True:
             idx += 1
 
             try:
                 result = self._store[idx](*args, **kwargs)
                 return result
+
             except IndexError:
                 raise TypeError("Function(s) exist(s) but with a different signature.")
+
             except (TypeError, NameError) as e:                
-                if any(string in str(e) for string in ('Type of', 'missing', 'takes', 'not defined', 'unexpected', 'multiple')):
+                if any(string in str(e) for string in ('Type of', 'missing', 'takes', 
+                'not defined', 'unexpected', 'multiple')) and 'Type of result' not in str(e):
                     continue
                 else:
                     raise e
@@ -86,12 +93,16 @@ overloaded = Overloader()
 
 
 @overloaded
-def foo(a: int, b: int): 
-    print(a + b)
+def foo(a, b): 
+    print('Generic output', a, b)
 
 @overloaded
 def foo(a: str, b: str): 
     print('String' + a + b)
+
+@overloaded
+def foo(a: int, b: int): 
+    print(a + b)
 
 @overloaded
 def foo(a, b, c): 
