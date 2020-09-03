@@ -43,16 +43,11 @@ def test_specific_over_generic(overloaded):
     @overloaded
     def foo(a): return 'generic:' + str(a)
 
-    class A: 
-        def __str__(self): return 'A instance'
-
     assert overloaded.foo('ing') == 'str:ing'
     assert overloaded.foo(3.14) == 'float:3.14'
-    assert overloaded.foo(A()) == 'generic:A instance'
+    assert overloaded.foo(set()) == 'generic:set()'
 
 def test_specific_over_generic_advanced(overloaded):
-    class A: ...
-
     @overloaded
     def foo(a, b, c): return '||'
 
@@ -63,9 +58,27 @@ def test_specific_over_generic_advanced(overloaded):
     def foo(a: str, b, c: tuple): return 'str||tuple'
 
     assert overloaded.foo('', 0, (3, 4)) == 'str|int|tuple'
-    assert overloaded.foo('', A(), (3, 4)) == 'str||tuple'
+    assert overloaded.foo('', set(), (3, 4)) == 'str||tuple'
     assert overloaded.foo(0, -1, 0) == '||'
 
+def test_with_different_kinds_of_args(overloaded):
+    from numbers import Number
+
+    @overloaded
+    def foo(a: Number, b: Number, c: Number): return a + b - c
+
+    assert not overloaded.foo(1, 1, 2) 
+    assert not overloaded.foo(1, 1, c = 2) 
+    assert not overloaded.foo(1, b = 1, c = 2)
+    assert not overloaded.foo(a = 1.5, b = 1.5, c = 3)
+
+    @overloaded
+    def foo(a: Number, /, b: Number, c: Number, *, d: Number): return a - b + c - d
+
+    assert not overloaded.foo(2.5, 5, 7.5, d = 5)
+    assert not overloaded.foo(2.5, 5, c = 7.5, d = 5)
+    with pytest.raises(TypeError):
+        overloaded.foo(2.5, 5, 7.5, 5)
 
 def test_does_not_change_original_function(overloaded):
     def foo(): ...

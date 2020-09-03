@@ -27,7 +27,7 @@ class IteratorOverListOfFunctions:
                 
                 raise TypeError(error_msg)
 
-            except TypeError as e:                
+            except TypeError as e: # hard debugging because it catches all the TypeErrors. TOFIX
                 continue
 
     def __len__(self):
