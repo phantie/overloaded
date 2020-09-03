@@ -61,3 +61,11 @@ def test_specific_over_generic_advanced(overloaded):
     assert overloaded.foo('', 0, (3, 4)) == 'str|int|tuple'
     assert overloaded.foo('', A(), (3, 4)) == 'str||tuple'
     assert overloaded.foo(0, -1, 0) == '||'
+
+
+def test_does_not_change_original_function(overloaded):
+    def foo(): ...
+    _foo = foo
+    foo = overloaded(foo)
+
+    assert foo is _foo
