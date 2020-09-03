@@ -1,5 +1,6 @@
-import pytest
 from overloaded import Overloader
+import pytest
+import sys
 
 @pytest.fixture
 def overloaded():
@@ -42,9 +43,12 @@ def test_specific_over_generic(overloaded):
     @overloaded
     def foo(a): return 'generic:' + str(a)
 
+    class A: 
+        def __str__(self): return 'A instance'
+
     assert overloaded.foo('ing') == 'str:ing'
     assert overloaded.foo(3.14) == 'float:3.14'
-    assert overloaded.foo(0) == 'generic:0'
+    assert overloaded.foo(A()) == 'generic:A instance'
 
 def test_specific_over_generic_advanced(overloaded):
     class A: ...
@@ -69,3 +73,30 @@ def test_does_not_change_original_function(overloaded):
     foo = overloaded(foo)
 
     assert foo is _foo
+
+@pytest.mark.skipif(sys.version_info >= (3, 9), 
+reason="In python 3.9 will be possible to type hint some types, for ex. list, with no need to import List from typing")
+def test_complicated_types(overloaded):
+
+    from typing import Type, List, Dict
+
+    class A: ...
+    
+    @overloaded
+    def foo(_type: Type[A]): return _type
+
+    assert overloaded.foo(A) is A
+
+
+    @overloaded
+    def foo(_type: A): return _type
+
+    assert isinstance(overloaded.foo(A()), A)
+
+
+    @overloaded
+    def bar(arr: List[Dict]): return arr
+    assert overloaded.bar([{1: 2, 3: 4}, {5: 6}])
+    
+    with pytest.raises(TypeError):
+        overloaded.bar([[], []])
