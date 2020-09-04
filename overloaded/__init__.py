@@ -1,25 +1,36 @@
-from operator import attrgetter
 from functools import wraps
 from typeguard import typechecked
-from typing import get_type_hints
-from collections import namedtuple
-from copy import deepcopy
 from operator import itemgetter
 from functools import partial
-from typing import Union, Callable, Optional, Hashable
+from typing import get_type_hints, Union, Callable, Optional, Hashable, NamedTupleMeta, NamedTuple
+from abc import ABC, abstractproperty, abstractmethod, ABCMeta
+
 
 __all__ = ['Overloader']
 
-class Aggregate:
+class NamedTupleABCMeta(ABCMeta, NamedTupleMeta): ...
 
-    _type = namedtuple('_type', ['f', 'hintcount', 'original', 'id'])
+class AbstractPacked(metaclass=NamedTupleABCMeta):
+    @abstractproperty
+    def sort_key(self): ...
+
+class Packed(NamedTuple, AbstractPacked):
+    f: Callable
+    hintcount: int
+    original: Callable
+    id: Hashable
+
+    sort_key = itemgetter(1)
+
+class Aggregate:    
+    _type = Packed
 
     def __init__(self):
         self._store = []
 
     def __call__(self, *args, **kwargs):
         idx = -1
-        self._store.sort(reverse=True, key = itemgetter(1))  
+        self._store.sort(reverse=True, key = self._type.sort_key)  
         while True:
             idx += 1
 
