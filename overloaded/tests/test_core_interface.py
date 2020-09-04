@@ -1,10 +1,17 @@
 from overloaded import Overloader
 import pytest
 import sys
+from numbers import Number
 
 @pytest.fixture
 def overloaded():
     return Overloader()
+
+def test_raises_attr_error_if_function_not_overloaded(overloaded):
+    def foo(): ...
+    
+    with pytest.raises(AttributeError):
+        overloaded.foo()
 
 def test_basic_same_function_name(overloaded):
     @overloaded
@@ -62,7 +69,7 @@ def test_specific_over_generic_advanced(overloaded):
     assert overloaded.foo(0, -1, 0) == '||'
 
 def test_with_different_kinds_of_args(overloaded):
-    from numbers import Number
+    
 
     @overloaded
     def foo(a: Number, b: Number, c: Number): return a + b - c
@@ -80,8 +87,8 @@ def test_with_different_kinds_of_args(overloaded):
     with pytest.raises(TypeError):
         overloaded.foo(2.5, 5, 7.5, 5)
 
-# def test_does_not_change_original_function(overloaded):
-def test_does_not_change(overloaded):
+
+def test_does_not_change_original(overloaded):
     def foo(): ...
     _foo = foo
     foo = overloaded(foo)
@@ -89,24 +96,26 @@ def test_does_not_change(overloaded):
     assert foo is _foo
     assert not hasattr(foo, 'hintcount')
 
-@pytest.mark.skipif(sys.version_info >= (3, 9), 
-reason="In python 3.9 will be possible to type hint some types, for ex. list, with no need to import List from typing")
+
 def test_complicated_types(overloaded):
 
     from typing import Type, List, Dict
 
-    class A: ...
-    
-    @overloaded
-    def foo(_type: Type[A]): return _type
-
-    assert overloaded.foo(A) is A
+    if sys.version_info >= (3, 9):
+        List = list
+        Dict = dict
 
 
     @overloaded
-    def foo(_type: A): return _type
+    def foo(_type: Type[set]): return _type
 
-    assert isinstance(overloaded.foo(A()), A)
+    assert overloaded.foo(set) is set
+
+
+    @overloaded
+    def foo(_type: set): return _type
+
+    assert isinstance(overloaded.foo(set()), set)
 
 
     @overloaded
@@ -115,3 +124,43 @@ def test_complicated_types(overloaded):
     
     with pytest.raises(TypeError):
         overloaded.bar([[], []])
+
+
+def test_parameterized(overloaded):
+    @overloaded('1')
+    def foo(): ...
+
+
+
+    assert overloaded.foo() is None
+    assert foo() is None
+
+def test_param_id(overloaded):
+    @overloaded(13)
+    def foo(a: Number): return a ** 2
+
+    @overloaded
+    def foo(a: Number): return a ** 3
+
+    @overloaded(42)
+    def foo(): return 0
+
+    @overloaded((4, 9, 2020))
+    def foo(): return "The day this test was written"
+
+    assert foo() == "The day this test was written"
+    assert overloaded.foo.with_id(13)(3) == 9
+    assert overloaded.foo.with_id(42)() == 0
+    assert overloaded.foo.with_id((4, 9, 2020))() == "The day this test was written"
+
+
+    with pytest.raises(KeyError):
+        overloaded.foo.with_id('some id')
+
+
+def test_does_not_change_original_parameterized(overloaded):
+    def bar(): ...
+    _bar = bar
+    bar = overloaded('random_id')(bar)
+    assert bar is _bar
+    assert not hasattr(bar, 'hintcount')

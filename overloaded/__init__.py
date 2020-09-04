@@ -4,17 +4,22 @@ from typeguard import typechecked
 from typing import get_type_hints
 from collections import namedtuple
 from copy import deepcopy
+from operator import itemgetter
+from functools import partial
+from typing import Union, Callable, Optional, Hashable
 
 __all__ = ['Overloader']
 
-class IteratorOverListOfFunctions:
+class Aggregate:
+
+    _type = namedtuple('_type', ['f', 'hintcount', 'original', 'id'])
 
     def __init__(self):
         self._store = []
 
     def __call__(self, *args, **kwargs):
         idx = -1
-        self._store.sort(reverse=True, key = lambda x: x[1])  
+        self._store.sort(reverse=True, key = itemgetter(1))  
         while True:
             idx += 1
 
@@ -35,8 +40,26 @@ class IteratorOverListOfFunctions:
     def __len__(self):
         return self._store.__len__()
 
-    def add(self, f):
-        self._store.append(f)
+    def add(self, *args, **kwargs):
+        self._store.append(self._type(*args, **kwargs))
+
+    def with_id(self, id) -> Callable:
+        """The main purpose for this feature is to ease the burden of debugging, 
+        considering in the mean time calling the function with, for eg. overloaded.foo(),
+        catches all the the TypeErrors, but the one it raises itself, 
+        if none of the stored functions can be called with given arguments.
+
+        Returns the original function.
+        """
+
+        assert id is not None
+
+        for el in self._store:
+            if el.id == id:
+                return el.original
+        else:
+            raise KeyError(f'Function with id {id} does not exists.')
+        
 
 class defaultnamespace:
 
@@ -52,28 +75,30 @@ class defaultnamespace:
 
 
 class Overloader:
-    fmt = namedtuple('fmt', ['f', 'hintcount', 'original', 'id'])
 
     def __init__(self):
-        self.store = defaultnamespace(IteratorOverListOfFunctions)
+        self.store = defaultnamespace(Aggregate)
     
-    def __call__(self, f: callable):
-        def get_type_hint_count(f):
-            return len(get_type_hints(f))
+    def __call__(self, var: Union[Callable, Optional[Hashable]]) -> Callable:
+        def process(f, id=None):
+            def get_type_hint_count(f):
+                return len(get_type_hints(f))
 
-        hintcount = get_type_hint_count(f)
-        typechecked_f = typechecked(f, always=True)
+            hintcount = get_type_hint_count(f)
+            typechecked_f = typechecked(f, always=True)
 
-        data = self.fmt(typechecked_f, hintcount, f, None)
+            self.store.__getattribute__(f.__name__).add(typechecked_f, hintcount, f, id)
+            return f
 
-        getattr(self.store, f.__name__).add(data)
-        return f
+        if callable(var):
+            return process(var)
+        else:
+            return partial(process, id=var)
+
 
     def __getattribute__(self, name):
 
-        if name != 'store' and name!='fmt' and (found := object.__getattribute__(object.__getattribute__(self, 'store'), name)):
+        if name != 'store' and (found := object.__getattribute__(object.__getattribute__(self, 'store'), name)):
             return found
 
         return object.__getattribute__(self, name)
-
-    # def get_func_by_id(id: str):
