@@ -1,6 +1,6 @@
 from functools import wraps
 from typeguard import typechecked
-from operator import itemgetter
+from operator import attrgetter
 from functools import partial
 from typing import get_type_hints, Union, Callable, Optional, Hashable, NamedTupleMeta, NamedTuple
 from abc import ABC, abstractproperty, abstractmethod, ABCMeta
@@ -14,13 +14,17 @@ class AbstractPacked(metaclass=NamedTupleABCMeta):
     @abstractproperty
     def sort_key(self): ...
 
+    @abstractproperty
+    def sort_reverse(self): ...
+
 class Packed(NamedTuple, AbstractPacked):
     f: Callable
     hintcount: int
     original: Callable
     id: Hashable
 
-    sort_key = itemgetter(1)
+    sort_key = attrgetter("hintcount")
+    sort_reverse = True
 
 class Aggregate:    
     _type = Packed
@@ -30,7 +34,7 @@ class Aggregate:
 
     def __call__(self, *args, **kwargs):
         idx = -1
-        self._store.sort(reverse=True, key = self._type.sort_key)  
+        self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
         while True:
             idx += 1
 
