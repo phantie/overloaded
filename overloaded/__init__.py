@@ -2,6 +2,8 @@ from operator import attrgetter
 from functools import wraps
 from typeguard import typechecked
 from typing import get_type_hints
+from collections import namedtuple
+from copy import deepcopy
 
 __all__ = ['Overloader']
 
@@ -12,12 +14,12 @@ class IteratorOverListOfFunctions:
 
     def __call__(self, *args, **kwargs):
         idx = -1
-        self._store.sort(reverse=True, key=attrgetter('hintcount'))
+        self._store.sort(reverse=True, key = lambda x: x[1])  
         while True:
             idx += 1
 
             try:
-                return self._store[idx](*args, **kwargs)
+                return self._store[idx].f(*args, **kwargs)
 
             except IndexError:
                 if idx > 1:
@@ -33,7 +35,7 @@ class IteratorOverListOfFunctions:
     def __len__(self):
         return self._store.__len__()
 
-    def append(self, f):
+    def add(self, f):
         self._store.append(f)
 
 class defaultnamespace:
@@ -48,22 +50,30 @@ class defaultnamespace:
             self.__setattr__(name, self._type())
             return object.__getattribute__(self, name)
 
+
 class Overloader:
+    fmt = namedtuple('fmt', ['f', 'hintcount', 'original', 'id'])
 
     def __init__(self):
         self.store = defaultnamespace(IteratorOverListOfFunctions)
     
     def __call__(self, f: callable):
-        def add_type_hints_count(f):
-            f.hintcount = len(get_type_hints(f))
-            return f
+        def get_type_hint_count(f):
+            return len(get_type_hints(f))
 
-        getattr(self.store, f.__name__).append(typechecked(add_type_hints_count(f), always=True))
+        hintcount = get_type_hint_count(f)
+        typechecked_f = typechecked(f, always=True)
+
+        data = self.fmt(typechecked_f, hintcount, f, None)
+
+        getattr(self.store, f.__name__).add(data)
         return f
 
     def __getattribute__(self, name):
 
-        if name != 'store' and (found := object.__getattribute__(object.__getattribute__(self, 'store'), name)):
+        if name != 'store' and name!='fmt' and (found := object.__getattribute__(object.__getattribute__(self, 'store'), name)):
             return found
 
         return object.__getattribute__(self, name)
+
+    # def get_func_by_id(id: str):

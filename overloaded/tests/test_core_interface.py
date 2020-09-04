@@ -80,12 +80,14 @@ def test_with_different_kinds_of_args(overloaded):
     with pytest.raises(TypeError):
         overloaded.foo(2.5, 5, 7.5, 5)
 
-def test_does_not_change_original_function(overloaded):
+# def test_does_not_change_original_function(overloaded):
+def test_does_not_change(overloaded):
     def foo(): ...
     _foo = foo
     foo = overloaded(foo)
 
     assert foo is _foo
+    assert not hasattr(foo, 'hintcount')
 
 @pytest.mark.skipif(sys.version_info >= (3, 9), 
 reason="In python 3.9 will be possible to type hint some types, for ex. list, with no need to import List from typing")
