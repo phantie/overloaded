@@ -173,7 +173,7 @@ def test_TypeError_catching(overloaded):
     with pytest.raises(TypeError) as err:
         overloaded.foo(13)
         
-        assert str(err) == "function exists, but with a different signature"
+    assert str(err.value) == "function exists, but with a different signature"
 
     @overloaded
     def foo(a: int, b: int): ...
@@ -181,7 +181,7 @@ def test_TypeError_catching(overloaded):
     with pytest.raises(TypeError) as err:
         overloaded.foo(0, 1, 2)
         
-        assert str(err) == "functions exist, but with the different signatures"
+    assert str(err.value) == "functions exist, but with the different signatures"
 
     with pytest.raises(TypeError):
         overloaded.foo(1, 'str')
@@ -191,16 +191,17 @@ def test_does_not_catch_internal_TypeErrors(overloaded):
     @overloaded
     def foo(): return int(None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError) as err:
         overloaded.foo()
-        assert str(err).startswith("int() argument must be a string, a bytes-like object or a number, not 'NoneType'")
 
+    assert str(err.value).startswith("int() argument must be a string, a bytes-like object or a number, not 'NoneType'")
 
     @overloaded
     def foo(string: str): return 1 + string
 
     with pytest.raises(TypeError) as err:
         overloaded.foo('will be broken inside')
-        assert str(err).startswith('unsupported operand type(s) for +')
+
+    assert str(err.value).startswith('unsupported operand type(s) for +')
 
 
