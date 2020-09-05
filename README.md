@@ -1,2 +1,2 @@
 # overloaded
-Function overload. Supports type hinting. Does not change a function, but stores a wrapped one.
+Function overload. Supports complex type checking. Does not modify an original function.
