@@ -43,9 +43,9 @@ class Aggregate:
 
             except IndexError:
                 if idx > 1:
-                    error_msg = "Functions exist but with the different signatures."
+                    error_msg = "functions exist, but with the different signatures"
                 else:
-                    error_msg = "Function exists but with a different signature."
+                    error_msg = "function exists, but with a different signature"
                 
                 raise TypeError(error_msg)
 
@@ -69,16 +69,20 @@ class Aggregate:
     def add(self, *args, **kwargs):
         self._store.append(self._type(*args, **kwargs))
 
-    def with_id(self, id) -> Callable:
-        """Returns the original function. So no type checks."""
+    def with_id(self, id, type_check=False) -> Callable:
+        """On default returns the original function."""
 
         assert id is not None
 
         for el in self._store:
             if el.id == id:
-                return el.original
+                if type_check:
+                    return el.f
+                else:
+                    return el.original
+
         else:
-            raise KeyError(f'Function with id {id} does not exists.')
+            raise KeyError(f'function with id {id} does not exist')
         
 
 class defaultnamespace:
