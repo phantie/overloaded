@@ -97,6 +97,9 @@ class defaultnamespace:
             self.__setattr__(name, self._type())
             return object.__getattribute__(self, name)
 
+    def __getitem__(self, name):
+        return self.__getattribute__(name)
+
 
 class Overloader:
 
@@ -111,7 +114,7 @@ class Overloader:
             hintcount = get_type_hint_count(f)
             typechecked_f = typechecked(f, always=True)
 
-            self.store.__getattribute__(f.__name__).add(typechecked_f, hintcount, f, id)
+            self.store[f.__name__].add(typechecked_f, hintcount, f, id)
             return f
 
         if callable(var):
