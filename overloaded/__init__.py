@@ -38,16 +38,16 @@ class Aggregate:
         while True:
             idx += 1
 
-            try:
-                return self._store[idx].f(*args, **kwargs)
-
-            except IndexError:
+            if idx >= len(self._store):
                 if idx > 1:
                     error_msg = "functions exist, but with the different signatures"
                 else:
                     error_msg = "function exists, but with a different signature"
-                
+
                 raise TypeError(error_msg)
+
+            try:
+                return self._store[idx].f(*args, **kwargs)
 
             except TypeError as error:
                 typechecked_error_messages_beginnings = [
