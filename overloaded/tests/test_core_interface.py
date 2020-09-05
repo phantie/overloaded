@@ -164,3 +164,24 @@ def test_does_not_change_original_parameterized(overloaded):
     bar = overloaded('random_id')(bar)
     assert bar is _bar
     assert not hasattr(bar, 'hintcount')
+
+
+def test_TypeError_catching(overloaded):
+    @overloaded
+    def foo(): ...
+
+    with pytest.raises(TypeError) as err:
+        overloaded.foo(13)
+        
+        assert str(err) == "Function exists but with a different signature."
+
+    @overloaded
+    def foo(a: int, b: int): ...
+
+    with pytest.raises(TypeError) as err:
+        overloaded.foo(0, 1, 2)
+        
+        assert str(err) == "Functions exist but with the different signatures."
+
+    with pytest.raises(TypeError):
+        overloaded.foo(1, 'str')

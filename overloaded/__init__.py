@@ -3,7 +3,7 @@ from typeguard import typechecked
 from operator import attrgetter
 from functools import partial
 from typing import get_type_hints, Union, Callable, Optional, Hashable, NamedTupleMeta, NamedTuple
-from abc import ABC, abstractproperty, abstractmethod, ABCMeta
+from abc import abstractproperty, ABCMeta
 
 
 __all__ = ['Overloader']
@@ -49,8 +49,19 @@ class Aggregate:
                 
                 raise TypeError(error_msg)
 
-            except TypeError as e: # hard debugging because it catches all the TypeErrors. TOFIX
-                continue
+            except TypeError as error:
+                typechecked_error_messages_beginnings = [
+                    "too many positional arguments",
+                    "missing a required argument",
+                    "got an unexpected keyword argument",
+                    "type of argument",
+                ]
+                
+                strerror = str(error)
+                if any(strerror.startswith(beginning) for beginning in typechecked_error_messages_beginnings):
+                    continue
+                else:
+                    raise error
 
     def __len__(self):
         return self._store.__len__()
@@ -59,13 +70,7 @@ class Aggregate:
         self._store.append(self._type(*args, **kwargs))
 
     def with_id(self, id) -> Callable:
-        """The main purpose for this feature is to ease the burden of debugging, 
-        considering in the mean time calling the function with, for eg. overloaded.foo(),
-        catches all the the TypeErrors, but the one it raises itself, 
-        if none of the stored functions can be called with given arguments.
-
-        Returns the original function.
-        """
+        """Returns the original function. So no type checks."""
 
         assert id is not None
 
