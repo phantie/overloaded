@@ -125,7 +125,7 @@ class Overloader:
 
     def __getattribute__(self, name):
 
-        if name != 'store' and (found := object.__getattribute__(object.__getattribute__(self, 'store'), name)):
-            return found
+        if name != 'store':
+            return object.__getattribute__(object.__getattribute__(self, 'store'), name)
 
         return object.__getattribute__(self, name)
