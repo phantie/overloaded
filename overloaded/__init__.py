@@ -3,21 +3,13 @@ from typeguard import typechecked
 from operator import attrgetter
 from functools import partial
 from typing import get_type_hints, Union, Callable, Optional, Hashable, NamedTupleMeta, NamedTuple
-from abc import abstractproperty, ABCMeta
-
+from dataclasses import dataclass
 
 __all__ = ['Overloader']
 
-class NamedTupleABCMeta(ABCMeta, NamedTupleMeta): ...
 
-class AbstractPacked(metaclass=NamedTupleABCMeta):
-    @abstractproperty
-    def sort_key(self): ...
-
-    @abstractproperty
-    def sort_reverse(self): ...
-
-class Packed(NamedTuple, AbstractPacked):
+@dataclass
+class Packed:
     f: Callable
     hintcount: int
     original: Callable
@@ -27,27 +19,18 @@ class Packed(NamedTuple, AbstractPacked):
     sort_reverse = True
 
 class Aggregate:    
-    _type = Packed
 
-    def __init__(self):
+    def __init__(self, _type):
         self._store = []
+        self._type = _type
 
     def __call__(self, *args, **kwargs):
-        idx = -1
+
         self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
-        while True:
-            idx += 1
-
-            if idx >= len(self._store):
-                if idx > 1:
-                    error_msg = "functions exist, but with the different signatures"
-                else:
-                    error_msg = "function exists, but with a different signature"
-
-                raise TypeError(error_msg)
-
+        
+        for idx, package in enumerate(self._store):
             try:
-                return self._store[idx].f(*args, **kwargs)
+                return package.f(*args, **kwargs)
 
             except TypeError as error:
                 typechecked_error_messages_beginnings = [
@@ -62,6 +45,14 @@ class Aggregate:
                     continue
                 else:
                     raise error
+        else:
+            if len(self._store) > 1:
+                error_msg = "functions exist, but with the different signatures"
+            else:
+                error_msg = "function exists, but with a different signature"
+
+            raise TypeError(error_msg)
+
 
     def __len__(self):
         return self._store.__len__()
@@ -87,14 +78,16 @@ class Aggregate:
 
 class defaultnamespace:
 
-    def __init__(self, _type):
+    def __init__(self, _type, *args, **kwargs):
         self._type = _type
+        self.args = args
+        self.kwargs = kwargs
 
     def __getattribute__(self, name):
         try:
             return object.__getattribute__(self, name)
         except AttributeError:
-            self.__setattr__(name, self._type())
+            self.__setattr__(name, self._type(*self.args, **self.kwargs))
             return object.__getattribute__(self, name)
 
     def __getitem__(self, name):
@@ -104,7 +97,7 @@ class defaultnamespace:
 class Overloader:
 
     def __init__(self):
-        self.store = defaultnamespace(Aggregate)
+        self.store = defaultnamespace(Aggregate, Packed)
     
     def __call__(self, var: Union[Callable, Optional[Hashable]]) -> Callable:
         def process(f, id=None):
