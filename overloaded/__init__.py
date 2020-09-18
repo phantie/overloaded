@@ -1,19 +1,17 @@
-from functools import wraps
 from typeguard import typechecked
 from operator import attrgetter
 from functools import partial
-from typing import get_type_hints, Union, Callable, Optional, Hashable, NamedTupleMeta, NamedTuple
-from dataclasses import dataclass
+from typing import get_type_hints, Union, Callable, Optional, Hashable
 
 __all__ = ['Overloader']
 
-
-@dataclass
 class Packed:
-    f: Callable
-    hintcount: int
-    original: Callable
-    id: Hashable
+
+    def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable):
+        self.f = f
+        self.hintcount = hintcount
+        self.original = original
+        self.id = id
 
     sort_key = attrgetter("hintcount")
     sort_reverse = True
@@ -99,7 +97,7 @@ class Overloader:
     def __init__(self):
         self.store = defaultnamespace(Aggregate, Packed)
     
-    def __call__(self, var: Union[Callable, Optional[Hashable]]) -> Callable:
+    def __call__(self, var: Union[Callable, Hashable]) -> Callable:
         def process(f, id=None):
             def get_type_hint_count(f):
                 return len(get_type_hints(f))
