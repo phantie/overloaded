@@ -1,7 +1,7 @@
 from typeguard import typechecked
 from operator import attrgetter
 from functools import partial
-from typing import get_type_hints, Union, Callable, Optional, Hashable
+from typing import get_type_hints, Union, Callable, Hashable
 
 __all__ = ['Overloader']
 
@@ -76,16 +76,14 @@ class Aggregate:
 
 class defaultnamespace:
 
-    def __init__(self, _type, *args, **kwargs):
-        self._type = _type
-        self.args = args
-        self.kwargs = kwargs
+    def __init__(self, _get_inst):
+        self._get_inst = _get_inst
 
     def __getattribute__(self, name):
         try:
             return object.__getattribute__(self, name)
         except AttributeError:
-            self.__setattr__(name, self._type(*self.args, **self.kwargs))
+            self.__setattr__(name, self._get_inst())
             return object.__getattribute__(self, name)
 
     def __getitem__(self, name):
@@ -95,7 +93,7 @@ class defaultnamespace:
 class Overloader:
 
     def __init__(self):
-        self.store = defaultnamespace(Aggregate, Packed)
+        self.store = defaultnamespace(lambda: Aggregate(Packed))
     
     def __call__(self, var: Union[Callable, Hashable]) -> Callable:
         def process(f, id=None):
