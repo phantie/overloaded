@@ -2,10 +2,20 @@ from typeguard import typechecked
 from operator import attrgetter
 from functools import partial
 from typing import get_type_hints, Union, Callable, Hashable
+from abc import ABC, abstractmethod
 
 __all__ = ['Overloader']
 
-class Packed:
+class AbstractPacked(ABC):
+    @property
+    @abstractmethod
+    def sort_key(self): ...
+
+    @property
+    @abstractmethod
+    def sort_reverse(self): ...
+
+class Packed(AbstractPacked):
 
     def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable):
         self.f = f
@@ -26,7 +36,7 @@ class Aggregate:
 
         self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
         
-        for idx, package in enumerate(self._store):
+        for package in self._store:
             try:
                 return package.f(*args, **kwargs)
 
@@ -79,15 +89,12 @@ class defaultnamespace:
     def __init__(self, _get_inst):
         self._get_inst = _get_inst
 
-    def __getattribute__(self, name):
-        try:
-            return object.__getattribute__(self, name)
-        except AttributeError:
-            self.__setattr__(name, self._get_inst())
-            return object.__getattribute__(self, name)
+    def __getattr__(self, name):
+        setattr(self, name, self._get_inst())
+        return getattr(self, name)
 
     def __getitem__(self, name):
-        return self.__getattribute__(name)
+        return getattr(self, name)
 
 
 class Overloader:
