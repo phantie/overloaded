@@ -11,11 +11,12 @@ class Packed:
     sort_key = attrgetter("hintcount")
     sort_reverse = True
 
-    def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable):
+    def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable, cls: Type = None):
         self.f = f
         self.hintcount = hintcount
         self.original = original
         self.id = id
+        self.cls = cls
 
     def __str__(self):
         return f"{self.__class__.__name__}({self.f.__name__}, hintcount={self.hintcount}, id={self.id!r})"
@@ -23,6 +24,14 @@ class Packed:
     def __repr__(self):
         return str(self)
 
+def is_staticmethod(f):
+    return isinstance(f, staticmethod)
+
+def is_classmethod(f):
+    return isinstance(f, classmethod)
+
+def is_static_or_classmethod(f):
+    return is_staticmethod(f) or is_classmethod(f)
 
 class Aggregate:    
 
@@ -35,8 +44,22 @@ class Aggregate:
         self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
         
         for package in self._store:
+            f = package.f
+
+            if is_classmethod(f):
+                assert len(args) > 0, 'classmethod takes at least one argument - a class or instance of a class'
+                
+                cls_or_instance = args[0]
+
+                args = args[1:]
+            
+                f = f.__get__(cls_or_instance, package.cls)
+
+            elif is_staticmethod(f):
+                f = f.__get__(None, package.cls)
+
             try:
-                return package.f(*args, **kwargs)
+                return f(*args, **kwargs)
 
             except TypeError as error:
                 typechecked_error_messages_beginnings = [
@@ -99,22 +122,24 @@ class defaultnamespace:
     def __str__(self):
         return '{' + ', '.join(f'"{k}": {v}' for k, v in vars(self).items() if not k.startswith('_')) + '}'
 
-def is_static_or_classmethod(f):
-    return isinstance(f, staticmethod) or isinstance(f, classmethod)
+
+def unwrap_method(f):
+    if is_static_or_classmethod(f):
+        return f.__func__
+    else:
+        return f
 
 class Overloader:
 
     class meth_wrap:
         def __init__(self, f: Union[Callable, Hashable], id = None):
             self.f = f
-            print(f)
             self.id = id
 
         def unwrap(self):
             return self.f
 
     def method(self, f_or_id, id = None):
-        # print(f_or_id, isinstance(f_or_id, staticmethod))
         if callable(f_or_id) or is_static_or_classmethod(f_or_id):
             self.tempmethods.append(self.meth_wrap(f_or_id, id = id))
         else:
@@ -127,35 +152,37 @@ class Overloader:
 
     def __call__(self, var: Union[Callable, Hashable]) -> Callable:
         def get_type_hint_count(f):
-            # if is_static_or_classmethod(f):
-            #     _f = f.__func__
-            # else:
-            #     _f = f
-            # return len(get_type_hints(_f))
-            return len(get_type_hints(f))
+            return len(get_type_hints(unwrap_method(f)))
+
+        def get_typechecked_f_and_hintcount(f):
+            hintcount = get_type_hint_count(f)
+
+            typechecked_f = typechecked(unwrap_method(f), always=True)
+
+            if isinstance(f, staticmethod):
+                typechecked_f = staticmethod(typechecked_f)
+            elif isinstance(f, classmethod):
+                typechecked_f = classmethod(typechecked_f)
+
+            return typechecked_f, hintcount
 
         def process_f(f, id=None):
-
-            hintcount = get_type_hint_count(f)
-            typechecked_f = typechecked(f, always=True)
-
+            typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
             self.store[f.__name__].add(typechecked_f, hintcount, f, id)
             return f
 
         def overload_class(cls):
-            def process_meth(classname, meth_ovl):
+            def process_meth(cls, meth_ovl):
+
                 id = meth_ovl.id
 
                 f = meth_ovl.unwrap()
-                hintcount = get_type_hint_count(f)
-                typechecked_f = typechecked(f, always=True)
+                typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
 
-                self.clsstore[classname][f.__name__].add(typechecked_f, hintcount, f, id)
+                self.clsstore[cls.__name__][unwrap_method(f).__name__].add(typechecked_f, hintcount, f, id, cls)
 
-            classname = cls.__name__
             for method in self.tempmethods:
-                process_meth(classname, method)
-            print(self.tempmethods)
+                process_meth(cls, method)
 
             self.tempmethods.clear()
 
@@ -178,24 +205,7 @@ class Overloader:
                 try:
                     return object.__getattribute__(object.__getattribute__(self, 'clsstore'), name)
                 except AttributeError as e:
-                    # if str(e).startswith("'defaultnamespace' object has no attribute"):
-                    #     raise AttributeError(f'Class "{name}" has no overloaded methods')
-                    # else:
-                    #     raise
-                    raise
-
-# overloaded = Overloader()
-
-# @overloaded
-# class A:
-#     @overloaded.method
-#     @classmethod
-#     def foo(cls, ):
-#         return 'awesome'
-
-#     @overloaded.method
-#     @classmethod
-#     def foo(cls, what):
-#         return f'superb-{what}'
-
-# assert overloaded.A.foo() == 'awesome'
+                    if str(e).startswith("'defaultnamespace' object has no attribute"):
+                        raise AttributeError(f'Class "{name}" has no overloaded methods')
+                    else:
+                        raise
