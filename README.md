@@ -9,10 +9,10 @@ Examples:
 
   With functions:
     
-    @overloaded
+    @overloaded('useless') 
     def foo(): return 0
   
-    @overloaded
+    @overloaded('adder') # NOTE You may use as ID any hashable type except classes and functions
     def foo(a, b): return a + b
     
     @overloaded
@@ -25,7 +25,10 @@ Examples:
     assert overloaded.foo(2, 2) == 4
     assert overloaded.foo('me', 'ow') == 'me...ow'
     assert overloaded.foo(2.5, 8) == 10
-    
+
+    assert overloaded.foo.with_id('useless')() == 0
+    assert overloaded.foo.with_id('adder')(5, 5) == 10
+
 
   With methods:
     
@@ -33,7 +36,7 @@ Examples:
     class A:
         hidden = 42
 
-        @overloaded.method
+        @overloaded.method('simple-method')
         def foo(self): return 'normal_foo_' + str(self.hidden)
 
         @overloaded.method
@@ -48,6 +51,7 @@ Examples:
     a.hidden = 13
 
     assert overloaded.A.foo(a) == 'normal_foo_13'
+    assert overloaded.A.foo.with_id('simple-method')(a)
 
     # That's how classmethod works
     assert overloaded.A.bar(A) == 'classmethod_bar_42' # Class
