@@ -47,6 +47,10 @@ Examples:
         @staticmethod
         def baz(): return 'staticmethod_baz'
 
+        @overloaded.method
+        @staticmethod
+        def sum(*args): return sum(args)
+
     a = A()
     a.hidden = 13
 
@@ -58,3 +62,4 @@ Examples:
     assert overloaded.A.bar(a) == 'classmethod_bar_42' # Instance
 
     assert overloaded.A.baz() == 'staticmethod_baz'
+    assert overloaded.A.sum(1, 2, 3, 4) == 10
