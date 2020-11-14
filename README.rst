@@ -9,7 +9,7 @@ All you need is an instance of Overloader:
 
 Examples:
 
-  With functions:
+With functions:
 
 .. code:: python
 
@@ -34,7 +34,11 @@ Examples:
     assert overloaded.foo.with_id('adder')(5, 5) == 10
 
 
-  With methods:
+
+
+With methods:
+
+.. code:: python
     
     @overloaded
     class A:
