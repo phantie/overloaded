@@ -23,21 +23,10 @@ class Packed:
     def __repr__(self):
         return str(self)
 
-# class PackedCls:
-
-#     def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable):
-#         self.f = f
-#         self.hintcount = hintcount
-#         self.original = original
-#         self.id = id
-
-#     sort_key = attrgetter("hintcount")
-#     sort_reverse = True
 
 class Aggregate:    
 
     def __init__(self, _type):
-        print('Created new')
         self._store = []
         self._type = _type
 
@@ -83,9 +72,6 @@ class Aggregate:
         """On default returns the original function."""
 
         assert id is not None
-        # print(dir(self._store))
-        # print(list(el.id for el in self._store))
-        print(self._store)
         for el in self._store:
 
             if el.id == id:
@@ -113,36 +99,39 @@ class defaultnamespace:
     def __str__(self):
         return '{' + ', '.join(f'"{k}": {v}' for k, v in vars(self).items() if not k.startswith('_')) + '}'
 
+def is_static_or_classmethod(f):
+    return isinstance(f, staticmethod) or isinstance(f, classmethod)
 
 class Overloader:
 
-    class method:
-        # counter = 0
-
-        def __new__(cls, f_or_id, id = None):
-            if callable(f_or_id):
-                return super().__new__(cls)
-            else:
-                # cls.counter += 1
-                return partial(cls, id = f_or_id)
-
-        def __init__(self, f_or_id: Union[Callable, Hashable], id = None):
-            # f_or_id.__name__ = f"{f_or_id.__name__}|{self.counter}"
- 
-            self.f = f_or_id
+    class meth_wrap:
+        def __init__(self, f: Union[Callable, Hashable], id = None):
+            self.f = f
+            print(f)
             self.id = id
-            print(self.f, self.id)
-
 
         def unwrap(self):
             return self.f
 
+    def method(self, f_or_id, id = None):
+        # print(f_or_id, isinstance(f_or_id, staticmethod))
+        if callable(f_or_id) or is_static_or_classmethod(f_or_id):
+            self.tempmethods.append(self.meth_wrap(f_or_id, id = id))
+        else:
+            return partial(self.method, id = f_or_id)
+
     def __init__(self):
         self.store = defaultnamespace(lambda: Aggregate(Packed))
         self.clsstore = defaultnamespace(lambda: defaultnamespace(lambda: Aggregate(Packed)))
-    
+        self.tempmethods = []
+
     def __call__(self, var: Union[Callable, Hashable]) -> Callable:
         def get_type_hint_count(f):
+            # if is_static_or_classmethod(f):
+            #     _f = f.__func__
+            # else:
+            #     _f = f
+            # return len(get_type_hints(_f))
             return len(get_type_hints(f))
 
         def process_f(f, id=None):
@@ -153,38 +142,23 @@ class Overloader:
             self.store[f.__name__].add(typechecked_f, hintcount, f, id)
             return f
 
-
         def overload_class(cls):
             def process_meth(classname, meth_ovl):
-                print('called')
-                f = meth_ovl.unwrap()
                 id = meth_ovl.id
+
+                f = meth_ovl.unwrap()
                 hintcount = get_type_hint_count(f)
                 typechecked_f = typechecked(f, always=True)
+
                 self.clsstore[classname][f.__name__].add(typechecked_f, hintcount, f, id)
-                print(self.clsstore)
-
-
-            # def process_cls(cls, meth_ovl):
-            #     f = meth_ovl.unwrap()
-            #     id = meth_ovl.id
-            #     hintcount = get_type_hint_count(f)
-            #     typechecked_f = typechecked(f, always=True)
-            #     self.clsstore[cls.__name__][f.__name__].add(typechecked_f, hintcount, f, id)
-            #     print(self.clsstore)
 
             classname = cls.__name__
-            print(len(vars(cls).items()))
-            print(len(list(v for v in vars(cls).values() if isinstance(v, self.method))))
-            for key, value in vars(cls).items():
-                if isinstance(value, self.method):
-                    print('must process', key)
-                    # clsname = cls.__name__
-                    f = value.f
-                    # fname = f.__name__
+            for method in self.tempmethods:
+                process_meth(classname, method)
+            print(self.tempmethods)
 
-                    setattr(cls, key, value.unwrap())
-                    process_meth(classname, value)
+            self.tempmethods.clear()
+
             return cls
 
         if isclass(var):
@@ -195,63 +169,33 @@ class Overloader:
             return partial(process_f, id=var)
 
     def __getattribute__(self, name):
-        # if name == 'method':
-        #     return object.__getattribute__(self, name)
-
-        if name in set(['store', 'clsstore', 'method']):
+        if name in set(['store', 'clsstore', 'meth_wrap', 'method', 'tempmethods']):
             return object.__getattribute__(self, name)
         else:
             try:
                 return object.__getattribute__(object.__getattribute__(self, 'store'), name)
             except AttributeError:
-                return object.__getattribute__(object.__getattribute__(self, 'clsstore'), name)
+                try:
+                    return object.__getattribute__(object.__getattribute__(self, 'clsstore'), name)
+                except AttributeError as e:
+                    # if str(e).startswith("'defaultnamespace' object has no attribute"):
+                    #     raise AttributeError(f'Class "{name}" has no overloaded methods')
+                    # else:
+                    #     raise
+                    raise
 
+# overloaded = Overloader()
 
+# @overloaded
+# class A:
+#     @overloaded.method
+#     @classmethod
+#     def foo(cls, ):
+#         return 'awesome'
 
-overloaded = Overloader()
+#     @overloaded.method
+#     @classmethod
+#     def foo(cls, what):
+#         return f'superb-{what}'
 
-
-
-@overloaded
-class A:
-    @overloaded.method('primary')
-    def foo(self, one): return one
-
-    @overloaded.method('secondary')
-    def foo(self, one, two): return one + two
-
-    @overloaded.method('3')
-    def foo(self, one, two, three): return one + two + three
-
-
-    # @overloaded.method('secondary')
-    # def bar(self, plus): return 'bar' + plus
-
-print(dir(A))
-
-a = A()
-
-
-
-# print(overloaded.A.bar.with_id('secondary')(a, 'baz'))
-# print(overloaded.A.foo.with_id('primary')(a))
-
-# print(overloaded.A.foo(a, 1, 2, 3))
-# print(overloaded.A.foo(a, 1, 2, 3))
-# print(overloaded.A.foo.with_id('3')(a, 1, 2, 3))
-
-# @overloaded(13)
-# def foo():...
-
-# @overloaded(14)
-# def foo(a):...
-
-# overloaded.foo.with_id(13)
-
-# class B:
-#     def foo(self): ...
-#     def bar(self): ...
-
-# nsp = defaultnamespace(lambda: defaultnamespace(lambda: Aggregate(Packed)))
-
-# nsp['B'].
+# assert overloaded.A.foo() == 'awesome'
