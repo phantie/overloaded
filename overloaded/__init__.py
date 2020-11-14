@@ -19,10 +19,26 @@ class Packed:
         self.cls = cls
 
     def __str__(self):
-        return f"{self.__class__.__name__}({self.f.__name__}, hintcount={self.hintcount}, id={self.id!r})"
+        name = getattr(self.f, '__name__', None) or getattr(self.f.__func__, '__name__')
+        return f"{self.__class__.__name__}({name!r}, hintcount={self.hintcount}, id={self.id!r})"
 
     def __repr__(self):
         return str(self)
+
+    def prepare_callable(self, f, *args, **kwargs):
+        if is_classmethod(f):
+            assert len(args) > 0, 'classmethod takes at least one argument - a class or instance of a class'
+            
+            cls_or_instance = args[0]
+
+            args = args[1:]
+        
+            f = f.__get__(cls_or_instance, self.cls)
+
+        elif is_staticmethod(f):
+            f = f.__get__(None, self.cls)
+        
+        return f, args, kwargs
 
 def is_staticmethod(f):
     return isinstance(f, staticmethod)
@@ -44,22 +60,10 @@ class Aggregate:
         self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
         
         for package in self._store:
-            f = package.f
-
-            if is_classmethod(f):
-                assert len(args) > 0, 'classmethod takes at least one argument - a class or instance of a class'
-                
-                cls_or_instance = args[0]
-
-                args = args[1:]
-            
-                f = f.__get__(cls_or_instance, package.cls)
-
-            elif is_staticmethod(f):
-                f = f.__get__(None, package.cls)
+            f, _args, _kwargs = package.prepare_callable(package.f, *args, **kwargs)
 
             try:
-                return f(*args, **kwargs)
+                return f(*_args, **_kwargs)
 
             except TypeError as error:
                 typechecked_error_messages_beginnings = [
@@ -93,16 +97,33 @@ class Aggregate:
 
     def with_id(self, id, type_check=False) -> Callable:
         """On default returns the original function."""
+        class Proxy:
+            def __init__(self, package, original):
+                self.package = package
+                self.original = original
 
-        assert id is not None
+            def __call__(self, *args, **kwargs):
+                f, _args, _kwargs = self.package.prepare_callable(
+                    self.package.original if self.original else self.package.f,
+                     *args, **kwargs)
+
+                return f(*_args, **_kwargs)
+
+
+        assert id is not None, 'ID must not be None'
+
         for el in self._store:
 
             if el.id == id:
                 if type_check:
-                    return el.f
+                    f = el.f
                 else:
-                    return el.original
+                    f = el.original
 
+                if is_static_or_classmethod(f):
+                    f = Proxy(el, not type_check)
+
+                return f
         else:
             raise KeyError(f'function with id {id!r} does not exist')
         
@@ -173,12 +194,10 @@ class Overloader:
 
         def overload_class(cls):
             def process_meth(cls, meth_ovl):
-
                 id = meth_ovl.id
 
                 f = meth_ovl.unwrap()
                 typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
-
                 self.clsstore[cls.__name__][unwrap_method(f).__name__].add(typechecked_f, hintcount, f, id, cls)
 
             for method in self.tempmethods:
