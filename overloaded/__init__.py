@@ -1,29 +1,85 @@
-from typeguard import typechecked
-from operator import attrgetter
+from typing import get_type_hints, Union, Hashable, Type, Callable
+from types import SimpleNamespace, FunctionType
 from functools import partial
-from typing import get_type_hints, Union, Callable, Hashable, Type
-
 from inspect import isclass
+
+from typeguard import typechecked
+
 
 __all__ = ['Overloader']
 
+
+def get_wrapper(f):
+    res = type(f)
+    return res if res is not FunctionType else None 
+
+
+class WrappedIn:
+
+    _registered = {}
+
+    @classmethod
+    def register(cls, 
+        wrapper: Type, 
+        get_callable,
+        get_inner = lambda wrapped: wrapped.__func__ ):
+
+        cls._registered[wrapper] = SimpleNamespace(
+            get_callable=get_callable,
+            get_inner=get_inner,
+        )
+
+    @classmethod
+    def this(cls, wrapper):
+        return wrapper in cls._registered
+
+    def __class_getitem__(cls, key):
+        return cls._registered[key]
+
+    @classmethod
+    def unwrap(cls, f):
+        return cls[get_wrapper(f)].get_inner(f)
+
+    @classmethod
+    def get_name(cls, f):
+        return cls.unwrap(f).__name__
+
+
+def classmethod_get_callable(f, cls, *args, **kwargs):
+    assert len(args) > 0, 'classmethod takes at least one argument - a class or instance of a class'
+    
+    cls_or_instance = args[0]
+    args = args[1:]
+
+    f = classmethod(f).__get__(cls_or_instance, cls)
+
+    return lambda: f(*args, **kwargs)
+
+def staticmethod_get_callable(f, cls, *args, **kwargs):
+    f = staticmethod(f).__get__(None, cls)
+    return lambda: f(*args, **kwargs)
+
+def unwrapped_get_callable(f, cls, *args, **kwargs):
+    return lambda: f(*args, **kwargs)
+
+
+WrappedIn.register(classmethod, classmethod_get_callable)
+WrappedIn.register(staticmethod, staticmethod_get_callable)
+WrappedIn.register(None, unwrapped_get_callable, lambda f: f)
+
+
 class Packed:
-    sort_key = attrgetter("hintcount")
+
+    sort_key = lambda value: value.hintcount
     sort_reverse = True
 
-    def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable, cls: Type = None):
+    def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable, cls: Type = None, wrapper: Type = None):
         self.f = f
         self.hintcount = hintcount
         self.original = original
         self.id = id
         self.cls = cls
-
-    def __str__(self):
-        name = getattr(self.f, '__name__', None) or getattr(self.f.__func__, '__name__')
-        return f"{self.__class__.__name__}({name!r}, hintcount={self.hintcount}, id={self.id!r})"
-
-    def __repr__(self):
-        return str(self)
+        self.wrapper = wrapper
 
     def prepare_callable(self, f, *args, **kwargs):
         if is_classmethod(f):
@@ -40,6 +96,7 @@ class Packed:
         
         return f, args, kwargs
 
+
 def is_staticmethod(f):
     return isinstance(f, staticmethod)
 
@@ -48,6 +105,7 @@ def is_classmethod(f):
 
 def is_static_or_classmethod(f):
     return is_staticmethod(f) or is_classmethod(f)
+
 
 class Aggregate:    
 
@@ -60,11 +118,9 @@ class Aggregate:
         self._store.sort(reverse=self._type.sort_reverse, key = self._type.sort_key)  
         
         for package in self._store:
-            f, _args, _kwargs = package.prepare_callable(package.f, *args, **kwargs)
-
+            f = WrappedIn[package.wrapper].get_callable(package.f, package.cls, *args, **kwargs)
             try:
-                return f(*_args, **_kwargs)
-
+                return f()
             except TypeError as error:
                 typechecked_error_messages_beginnings = [
                     "too many positional arguments",
@@ -103,30 +159,23 @@ class Aggregate:
                 self.original = original
 
             def __call__(self, *args, **kwargs):
-                f, _args, _kwargs = self.package.prepare_callable(
+                f = WrappedIn[self.package.wrapper].get_callable(
                     self.package.original if self.original else self.package.f,
-                     *args, **kwargs)
+                    self.package.cls,
+                    *args, **kwargs)
 
-                return f(*_args, **_kwargs)
+                return f()
 
 
         assert id is not None, 'ID must not be None'
 
         for el in self._store:
-
             if el.id == id:
-                if type_check:
-                    f = el.f
-                else:
-                    f = el.original
-
-                if is_static_or_classmethod(f):
-                    f = Proxy(el, not type_check)
-
+                f = Proxy(el, not type_check)
                 return f
         else:
             raise KeyError(f'function with id {id!r} does not exist')
-        
+
 
 class defaultnamespace:
 
@@ -140,51 +189,27 @@ class defaultnamespace:
     def __getitem__(self, name):
         return getattr(self, name)
 
-    def __str__(self):
-        return '{' + ', '.join(f'"{k}": {v}' for k, v in vars(self).items() if not k.startswith('_')) + '}'
-
-
-def unwrap_method(f):
-    if is_static_or_classmethod(f):
-        return f.__func__
-    else:
-        return f
 
 class Overloader:
-
-    class meth_wrap:
-        def __init__(self, f: Union[Callable, Hashable], id = None):
-            self.f = f
-            self.id = id
-
-        def unwrap(self):
-            return self.f
-
-    def method(self, f_or_id, id = None):
-        if callable(f_or_id) or is_static_or_classmethod(f_or_id):
-            self.tempmethods.append(self.meth_wrap(f_or_id, id = id))
-        else:
-            return partial(self.method, id = f_or_id)
 
     def __init__(self):
         self.store = defaultnamespace(lambda: Aggregate(Packed))
         self.clsstore = defaultnamespace(lambda: defaultnamespace(lambda: Aggregate(Packed)))
         self.tempmethods = []
 
+    def method(self, f_or_id, id = None):
+        if WrappedIn.this(get_wrapper(f_or_id)):
+            self.tempmethods.append((f_or_id, id))
+        else:
+            return partial(self.method, id = f_or_id)
+
     def __call__(self, var: Union[Callable, Hashable]) -> Callable:
         def get_type_hint_count(f):
-            return len(get_type_hints(unwrap_method(f)))
+            return len(get_type_hints(f))
 
         def get_typechecked_f_and_hintcount(f):
             hintcount = get_type_hint_count(f)
-
-            typechecked_f = typechecked(unwrap_method(f), always=True)
-
-            if isinstance(f, staticmethod):
-                typechecked_f = staticmethod(typechecked_f)
-            elif isinstance(f, classmethod):
-                typechecked_f = classmethod(typechecked_f)
-
+            typechecked_f = typechecked(f, always=True)
             return typechecked_f, hintcount
 
         def process_f(f, id=None):
@@ -193,15 +218,15 @@ class Overloader:
             return f
 
         def overload_class(cls):
-            def process_meth(cls, meth_ovl):
-                id = meth_ovl.id
+            def process_meth(cls, f, id):
+                wrapper = get_wrapper(f)
+                unwrapped = WrappedIn.unwrap(f)
 
-                f = meth_ovl.unwrap()
-                typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
-                self.clsstore[cls.__name__][unwrap_method(f).__name__].add(typechecked_f, hintcount, f, id, cls)
+                typechecked_f, hintcount = get_typechecked_f_and_hintcount(unwrapped)
+                self.clsstore[cls.__name__][unwrapped.__name__].add(typechecked_f, hintcount, unwrapped, id, cls, wrapper)
 
-            for method in self.tempmethods:
-                process_meth(cls, method)
+            for method, id in self.tempmethods:
+                process_meth(cls, method, id)
 
             self.tempmethods.clear()
 
@@ -215,7 +240,7 @@ class Overloader:
             return partial(process_f, id=var)
 
     def __getattribute__(self, name):
-        if name in set(['store', 'clsstore', 'meth_wrap', 'method', 'tempmethods']):
+        if name in set(['store', 'clsstore', 'method', 'tempmethods']):
             return object.__getattribute__(self, name)
         else:
             try:
