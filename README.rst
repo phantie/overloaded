@@ -3,12 +3,16 @@ Polymorphism in python! May overload functions and methods (static- and classmet
 
 All you need is an instance of Overloader:
 
+.. code:: python
+
     overloaded = Overloader()
 
 Examples:
 
   With functions:
-    
+
+.. code:: python
+
     @overloaded('useless') 
     def foo(): return 0
   
