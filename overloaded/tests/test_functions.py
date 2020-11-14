@@ -1,11 +1,6 @@
-from overloaded import Overloader
-import pytest
-import sys
-from numbers import Number
+from . import *
 
-@pytest.fixture
-def overloaded():
-    return Overloader()
+
 
 def test_raises_attr_error_if_function_not_overloaded(overloaded):
     def foo(): ...
@@ -136,6 +131,8 @@ def test_parameterized(overloaded):
     assert foo() is None
 
 def test_param_id(overloaded):
+    # NOTE ID must NOT be a Class
+
     @overloaded(13)
     def foo(a: Number): return a ** 2
 
@@ -203,5 +200,3 @@ def test_does_not_catch_internal_TypeErrors(overloaded):
         overloaded.foo('will be broken inside')
 
     assert str(err.value).startswith('unsupported operand type(s) for +')
-
-
