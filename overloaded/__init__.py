@@ -10,8 +10,7 @@ __all__ = ['Overloader']
 
 
 def get_wrapper(f):
-    res = type(f)
-    return res if res is not FunctionType else None 
+    return type(f)
 
 
 class WrappedIn:
@@ -65,7 +64,7 @@ def unwrapped_get_callable(f, cls, *args, **kwargs):
 
 WrappedIn.register(classmethod, classmethod_get_callable)
 WrappedIn.register(staticmethod, staticmethod_get_callable)
-WrappedIn.register(None, unwrapped_get_callable, lambda f: f)
+WrappedIn.register(FunctionType, unwrapped_get_callable, lambda f: f)
 
 
 class Packed:
@@ -80,31 +79,6 @@ class Packed:
         self.id = id
         self.cls = cls
         self.wrapper = wrapper
-
-    def prepare_callable(self, f, *args, **kwargs):
-        if is_classmethod(f):
-            assert len(args) > 0, 'classmethod takes at least one argument - a class or instance of a class'
-            
-            cls_or_instance = args[0]
-
-            args = args[1:]
-        
-            f = f.__get__(cls_or_instance, self.cls)
-
-        elif is_staticmethod(f):
-            f = f.__get__(None, self.cls)
-        
-        return f, args, kwargs
-
-
-def is_staticmethod(f):
-    return isinstance(f, staticmethod)
-
-def is_classmethod(f):
-    return isinstance(f, classmethod)
-
-def is_static_or_classmethod(f):
-    return is_staticmethod(f) or is_classmethod(f)
 
 
 class Aggregate:    
@@ -214,7 +188,7 @@ class Overloader:
 
         def process_f(f, id=None):
             typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
-            self.store[f.__name__].add(typechecked_f, hintcount, f, id)
+            self.store[f.__name__].add(typechecked_f, hintcount, f, id, wrapper=FunctionType)
             return f
 
         def overload_class(cls):
