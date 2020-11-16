@@ -33,11 +33,17 @@ def test_borsch(overloaded: Overloader):
         @classmethod
         def bar(cls): return 'classmethod_bar_' + str(cls.hidden)
 
+
+        @overloaded.method
+        @classmethod
+        def bar(cls, v: str):
+            return 'barbar' + v
+
         @overloaded.method('static-method')
         @staticmethod
         def baz(): return 'staticmethod_baz'
 
-        @overloaded.method
+        @overloaded.method('another-sum')
         @staticmethod
         def sum(*args): return sum(args)
 
@@ -48,14 +54,20 @@ def test_borsch(overloaded: Overloader):
 
     assert overloaded.A.foo(a) == 'normal_foo_13'
     assert overloaded.A.foo.with_id('simple-method')(a) == 'normal_foo_13'
+    assert overloaded.A.foo.with_id('simple-method')(self=a) == 'normal_foo_13'
 
     # That's how classmethod works
     assert overloaded.A.bar(A) == 'classmethod_bar_42' # Class
     assert overloaded.A.bar(a) == 'classmethod_bar_42' # Instance
     assert overloaded.A.bar.with_id('class-method')(A) == 'classmethod_bar_42'
     assert overloaded.A.bar.with_id('class-method')(a) == 'classmethod_bar_42'
+    assert overloaded.A.bar.with_id('class-method')(cls=A) == 'classmethod_bar_42'
+    assert overloaded.A.bar.with_id('class-method')(cls=a) == 'classmethod_bar_42'
+    assert overloaded.A.bar(cls=A) == 'classmethod_bar_42'
+    assert overloaded.A.bar(cls = A, v = 'bar') == 'barbarbar'
 
     assert overloaded.A.baz() == 'staticmethod_baz'
     assert overloaded.A.sum(1, 2, 3, 4) == 10
+    assert overloaded.A.sum.with_id('another-sum')(1, 2, 3, 4) == 10
 
     assert overloaded.A.baz.with_id('static-method')() == 'staticmethod_baz'

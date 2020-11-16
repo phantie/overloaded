@@ -174,3 +174,58 @@ def test_raises_Attribute_error_if_class_is_not_Overloaded(overloaded):
         overloaded.A.foo()
     
     assert str(err.value) == 'Class "A" has no overloaded methods'
+
+def test_keyword_arguments(overloaded):
+    @overloaded
+    class A:
+        from typing import List
+
+        @overloaded.method
+        def foo(self, i: int):
+            return 2 * i
+
+        @overloaded.method
+        def foo(self, i: List[int]):
+            return [el*2 for el in i]
+
+
+        secret = 8
+
+        @overloaded.method
+        @classmethod
+        def bar(cls, a: int, b: int) -> int:
+            return a * b * cls.secret
+
+        @overloaded.method
+        @classmethod
+        def bar(cls, a: float, b: float) -> int:
+            return round(a * b) * cls.secret
+
+
+        from typing import Dict
+        from numbers import Real
+        
+
+        @overloaded.method
+        @staticmethod
+        def baz(**kwargs):
+            return [k * v for k, v in kwargs.items()]
+
+        @overloaded.method
+        @staticmethod
+        def baz(r: Real):
+            from math import pi
+            return pi * r ** 2
+
+    a = A()
+
+    assert overloaded.A.foo(self=a, i=2) == 4
+    assert overloaded.A.foo(self=a, i=[1, 2, 3]) == [2, 4, 6]
+
+    assert overloaded.A.bar(cls=A, a=1, b=2) == 16
+    assert overloaded.A.bar(cls=a, a=2, b=2) == 32
+    assert overloaded.A.bar(cls=A, a=2.25, b=2) == 32
+    assert overloaded.A.bar(cls=A, a=2.26, b=2) == 40
+
+    assert overloaded.A.baz(me=3, mo=3, you=0) == ['mememe', 'momomo', '']
+    assert 314 < overloaded.A.baz(r=10) < 315 
