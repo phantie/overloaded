@@ -49,14 +49,12 @@ class WrappedIn:
 
     @classmethod
     def get_callable(cls, package, args, kwargs, original=False):
-        if original: # so dirty
+        if original:
             tchecked = package.f
             package.f = package.original
 
         try:
             f = cls[package.wrapper].get_callable(package, args, kwargs)
-        except Exception as e:
-            raise
         finally:
             if original:
                 package.f = tchecked
@@ -97,7 +95,7 @@ WrappedIn.register(None, unwrapped_get_callable, lambda f: f)
 
 class Packed:
 
-    sort_key = lambda value: value.hintcount
+    sort_key = lambda o: o.hintcount
     sort_reverse = True
 
     def __init__(self, f: Callable, hintcount: int, original: Callable, id: Hashable, cls: Type = None, wrapper: Type = None):
@@ -252,3 +250,5 @@ class Overloader:
                         raise AttributeError(f'Class "{name}" has no overloaded methods')
                     else:
                         raise
+
+# overloaded = Overloader()
