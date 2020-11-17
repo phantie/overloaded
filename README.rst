@@ -82,4 +82,26 @@ Install:
     
     pip install git+https://github.com/phantie/overloaded.git -U
 
-        
+Considerations and limitations:
+
+
+1. In situation where at least 2 functions/methods can be executed with given arguments and amount of hints you provide is equal among them you should define more specific ones at the first place.
+
+.. code:: python
+    
+    def foo(a: Real, b: Real): ...
+    def foo(a: Number, b: Number): ...
+    
+2. Do not handover a keyword argument named  `_self` or, even better, do not name an argument `_self` - if you stick to naming conventions it's not even a problem.
+
+.. code:: python
+    
+    @overloaded
+    class A:
+        @overloaded.method
+        def foo(_self): ...
+
+    a = A()
+
+    overloaded.A.foo(a) # fine
+    overloaded.A.foo(_self=a) # bad
