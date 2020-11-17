@@ -12,14 +12,6 @@ __all__ = ['Overloader']
 def get_wrapper(f):
     return type(f)
 
-# class Capsule:
-#     def __init__(self, f, cls):
-#         self.f = f
-#         self.cls = cls
-
-#     @property
-#     def f_and_cls(self):
-#         return (self.f, self.cls)
 
 class WrappedIn:
 
@@ -57,10 +49,13 @@ class WrappedIn:
             tchecked = package.f
             package.f = package.original
 
-        f = cls[package.wrapper].get_callable(package, args, kwargs)
-
-        if original:
-            package.f = tchecked
+        try:
+            f = cls[package.wrapper].get_callable(package, args, kwargs)
+        except Exception as e:
+            raise
+        finally:
+            if original:
+                package.f = tchecked
 
         return f
 

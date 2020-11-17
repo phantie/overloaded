@@ -53,6 +53,7 @@ def test_borsch(overloaded: Overloader):
     a.hidden = 13
 
     assert overloaded.A.foo(a) == 'normal_foo_13'
+    assert overloaded.A.foo(self=a) == 'normal_foo_13'
     assert overloaded.A.foo.with_id('simple-method')(a) == 'normal_foo_13'
     assert overloaded.A.foo.with_id('simple-method')(self=a) == 'normal_foo_13'
 
@@ -63,6 +64,7 @@ def test_borsch(overloaded: Overloader):
     assert overloaded.A.bar.with_id('class-method')(a) == 'classmethod_bar_42'
     assert overloaded.A.bar.with_id('class-method')(cls=A) == 'classmethod_bar_42'
     assert overloaded.A.bar.with_id('class-method')(cls=a) == 'classmethod_bar_42'
+    assert overloaded.A.bar(cls=a) == 'classmethod_bar_42'
     assert overloaded.A.bar(cls=A) == 'classmethod_bar_42'
     assert overloaded.A.bar(cls = A, v = 'bar') == 'barbarbar'
 
