@@ -10,7 +10,10 @@ __all__ = ['Overloader']
 
 
 def get_wrapper(f):
-    return type(f)
+    if (wrapper := type(f)) is FunctionType:
+        return None
+    else:
+        return wrapper
 
 
 class WrappedIn:
@@ -88,7 +91,7 @@ def unwrapped_get_callable(package, args, kwargs):
 
 WrappedIn.register(classmethod, classmethod_get_callable)
 WrappedIn.register(staticmethod, staticmethod_get_callable)
-WrappedIn.register(FunctionType, unwrapped_get_callable, lambda f: f)
+WrappedIn.register(None, unwrapped_get_callable, lambda f: f)
 
 
 class Packed:
@@ -209,7 +212,7 @@ class Overloader:
 
         def process_f(f, id=None):
             typechecked_f, hintcount = get_typechecked_f_and_hintcount(f)
-            self.store[f.__name__].add(typechecked_f, hintcount, f, id, wrapper=FunctionType)
+            self.store[f.__name__].add(typechecked_f, hintcount, f, id)
             return f
 
         def overload_class(cls):
