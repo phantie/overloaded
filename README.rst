@@ -74,3 +74,12 @@ With methods:
 
     assert overloaded.A.baz() == 'staticmethod_baz'
     assert overloaded.A.sum(1, 2, 3, 4) == 10
+
+
+Install:
+    
+.. code::
+    
+    pip install git+https://github.com/phantie/overloaded.git -U
+
+        
