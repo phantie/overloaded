@@ -229,3 +229,15 @@ def test_keyword_arguments(overloaded):
 
     assert overloaded.A.baz(me=3, mo=3, you=0) == ['mememe', 'momomo', '']
     assert 314 < overloaded.A.baz(r=10) < 315 
+
+def test_collision(overloaded):
+
+    @overloaded
+    class A:
+        @overloaded.method
+        def foo(_self): ...
+
+    a = A()
+
+    overloaded.A.foo(a) # fine
+    overloaded.A.foo(_self=a) # bad

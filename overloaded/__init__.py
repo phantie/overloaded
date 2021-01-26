@@ -8,7 +8,7 @@ from typeguard import typechecked
 
 __all__ = ['Overloader']
 
-__version__ = '1.2'
+__version__ = '1.2.1'
 
 def get_wrapper(f):
     if (wrapper := type(f)) is FunctionType:
@@ -113,7 +113,7 @@ class Aggregate:
         self._store = []
         self._type = _type
 
-    def __call__(_self, *args, **kwargs):
+    def __call__(_self, /, *args, **kwargs):
 
         _self._store.sort(reverse=_self._type.sort_reverse, key = _self._type.sort_key)  
         
