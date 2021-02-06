@@ -200,3 +200,10 @@ def test_does_not_catch_internal_TypeErrors(overloaded):
         overloaded.foo('will be broken inside')
 
     assert str(err.value).startswith('unsupported operand type(s) for +')
+
+def test_collision(overloaded):
+    @overloaded('some')
+    def foo(self): ...
+
+    overloaded.foo.with_id('some')(self=42)
+    overloaded.foo.with_id('some')(42)

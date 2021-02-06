@@ -8,7 +8,7 @@ from typeguard import typechecked
 
 __all__ = ['Overloader']
 
-__version__ = '1.2.1'
+__version__ = '1.2.2'
 
 def get_wrapper(f):
     if (wrapper := type(f)) is FunctionType:
@@ -25,7 +25,7 @@ class WrappedIn:
     def register(cls, 
         wrapper: Type, 
         get_callable,
-        get_inner = lambda wrapped: wrapped.__func__ ):
+        get_inner):
 
         cls._registered[wrapper] = SimpleNamespace(
             get_callable=get_callable,
@@ -80,18 +80,19 @@ def classmethod_get_callable(package, args, kwargs):
 
     return lambda: f(*args, **kwargs)
 
-def staticmethod_get_callable(package, args, kwargs):
-    f = staticmethod(package.f).__get__(None, package.cls)
-    return lambda: f(*args, **kwargs)
+able_to_handle = \
+    ((classmethod, 
+        classmethod_get_callable,
+        lambda wrapped: wrapped.__func__),
+    (staticmethod, 
+        lambda package, args, kwargs: lambda: staticmethod(package.f).__get__(None, package.cls)(*args, **kwargs),
+        lambda wrapped: wrapped.__func__),
+    (None, 
+        lambda package, args, kwargs: lambda: package.f(*args, **kwargs),
+        lambda f: f))
 
-def unwrapped_get_callable(package, args, kwargs):
-    return lambda: package.f(*args, **kwargs)
-
-
-WrappedIn.register(classmethod, classmethod_get_callable)
-WrappedIn.register(staticmethod, staticmethod_get_callable)
-WrappedIn.register(None, unwrapped_get_callable, lambda f: f)
-
+for case in able_to_handle:
+    WrappedIn.register(*case)
 
 class Packed:
 
@@ -151,21 +152,21 @@ class Aggregate:
     def add(self, *args, **kwargs):
         self._store.append(self._type(*args, **kwargs))
 
-    def with_id(_self, id, type_check=False) -> Callable:
+    def with_id(self, /, id, type_check=False) -> Callable:
         """On default returns the original function."""
         class Proxy:
-            def __init__(_self, package, original):
-                _self.package = package
-                _self.original = original
+            def __init__(self, /, package, original):
+                self.package = package
+                self.original = original
 
-            def __call__(_self, *args, **kwargs):
-                f = WrappedIn.get_callable(_self.package, args, kwargs, _self.original)
+            def __call__(self, /, *args, **kwargs):
+                f = WrappedIn.get_callable(self.package, args, kwargs, self.original)
                 return f()
 
 
         assert id is not None, 'ID must not be None'
 
-        for el in _self._store:
+        for el in self._store:
             if el.id == id:
                 f = Proxy(el, not type_check)
                 return f
@@ -237,7 +238,7 @@ class Overloader:
             return partial(process_f, id=var)
 
     def __getattribute__(self, name):
-        if name in set(['store', 'clsstore', 'method', 'tempmethods']):
+        if name in {'store', 'clsstore', 'method', 'tempmethods'}:
             return object.__getattribute__(self, name)
         else:
             try:
