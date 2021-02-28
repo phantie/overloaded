@@ -2,7 +2,7 @@
 ==============
 overloaded
 ==============
-Polymorphism in python! May overload functions and methods (static- and classmethods included). Supports complex type hinting. Does not modify original functions, classes and methods.
+Polymorphism in python! May overload functions and methods (including static- and classmethods). Supports complex type hinting. Does not modify original functions, classes and methods.
 
 All you need is an instance of Overloader:
 
