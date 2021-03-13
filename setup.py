@@ -3,7 +3,8 @@
 
 from setuptools import setup, find_packages
 from os.path import join, dirname
-from overloaded import __version__
+
+__version__ = '1.2.2'
 
 setup(
     author = 'phantie',

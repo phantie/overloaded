@@ -8,8 +8,6 @@ from typeguard import typechecked
 
 __all__ = ['Overloader']
 
-__version__ = '1.2.2'
-
 def get_wrapper(f):
     if (wrapper := type(f)) is FunctionType:
         return None
