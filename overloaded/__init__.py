@@ -127,9 +127,12 @@ class Aggregate:
                     "got an unexpected keyword argument",
                     "type of argument",
                 ]
-                
+
                 strerror = str(error)
-                if any(strerror.startswith(beginning) for beginning in typechecked_error_messages_beginnings):
+
+                if any(strerror.startswith(beginning) for beginning in typechecked_error_messages_beginnings) or \
+                    "positional argument" in strerror or \
+                    "required positional argument" in strerror:
                     continue
                 else:
                     raise error
